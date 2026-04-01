@@ -11,7 +11,7 @@ import vm from "node:vm";
 import { randomBytes } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import path from "node:path";
 import { transformSync } from "esbuild";
 import { typeCheck, type TypeCheckError } from "./type-checker.js";
 import type { ToolBindings } from "./tool-bindings.js";
@@ -67,7 +67,7 @@ const MAX_OUTPUT_BYTES = 50 * 1024;
  */
 function getTempFilePath(): string {
   const id = randomBytes(8).toString("hex");
-  return join(tmpdir(), `pi-codemode-${id}.log`);
+  return path.join(tmpdir(), `pi-codemode-${id}.log`);
 }
 
 /**
