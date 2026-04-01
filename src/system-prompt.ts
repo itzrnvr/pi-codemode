@@ -79,8 +79,8 @@ Use \`tools.describe_tools({ namespace })\` to browse tools, \`tools.search_tool
 - **Parallelize** independent calls with \`Promise.all\` — sequential awaits waste time
 - **Filter locally** — process data in code, return only what matters (huge token savings)
 - **Always \`await\`** shell commands: \`const r = await $\\\`cmd\\\`\` — unawaited \`$\` returns nothing
-- **NEVER use \`netstat\`, \`tasklist\`, \`findstr\`, or other Windows-specific commands** — they hang or fail in bash. For port/process checks, use \`fetch()\` (see example above). For system info, use \`os.*\` or \`require('net')\`
-- \`$\\\`cmd\\\`\` runs **bash** (zx) — use Unix commands (\`grep\`, \`ls\`, \`ps\`). On Windows this runs via Git Bash
+- \`$\\\`cmd\\\`\` runs **bash** via Git Bash on ALL platforms. Use Unix commands (\`grep\`, \`ls\`, \`cat\`, \`git\`). **Windows commands hang** (\`taskkill\`, \`netstat\`, \`tasklist\`, \`powershell\`, \`cmd\`)
+- **If a command times out or hangs** — use Node.js APIs instead: \`fetch()\` for HTTP, \`require('net')\` for sockets, \`require('child_process')\` for process management, \`os.*\` for system info
 - Use \`π.keyName\` (via \`strings\` param) for content with backticks, template literals, or nested quotes
 - Configured packages are **pre-loaded globals** — use directly (e.g. \`axios.get(...)\`), not via \`require()\`
 `;
