@@ -79,9 +79,11 @@ Use \`tools.describe_tools({ namespace })\` to browse tools, \`tools.search_tool
 - **Parallelize** independent calls with \`Promise.all\` — sequential awaits waste time
 - **Filter locally** — process data in code, return only what matters (huge token savings)
 - **Always \`await\`** shell commands: \`const r = await $\\\`cmd\\\`\` — unawaited \`$\` returns nothing
-- \`$\\\`cmd\\\`\` runs **bash** via Git Bash on ALL platforms. Use Unix commands (\`grep\`, \`ls\`, \`cat\`, \`git\`). **Windows-native commands hang in bash** (\`taskkill\`, \`netstat\`, \`tasklist\`, \`cmd\`)
-- Use \`$ps\\\`cmd\\\`\` to run **PowerShell** when you need Windows-native commands
-- **If a bash command times out or hangs** — use Node.js APIs instead: \`fetch()\` for HTTP, \`require('net')\` for sockets, \`require('child_process')\` for process management, \`os.*\` for system info
+- \`$\` and \`$ps\` are **pre-loaded globals** — use them directly. NEVER import them from \`zx\` and NEVER construct them (\`$.shell\` is a string, not a callable)
+- \`$\\\`cmd\\\`\` runs **bash** on ALL platforms. Use Unix commands (\`grep\`, \`ls\`, \`cat\`, \`git\`). On Windows, bash may be Git Bash or WSL; if it fails, switch to \`$ps\`
+- \`$ps\\\`cmd\\\`\` runs **PowerShell**. Use it on Windows for native commands (\`tasklist\`, \`taskkill\`, \`netstat\`, \`Get-Process\`, \`Stop-Process\`)
+- **If a shell command times out or hangs** — use Node.js APIs instead: \`fetch()\` for HTTP, \`require('net')\` for sockets, \`require('child_process')\` for process management, \`os.*\` for system info
+- \`require()\` only works in **unsandboxed mode**; in sandboxed mode, only the pre-loaded globals are available
 - **\`spawn()\` without \`.on('error', ...)\` can crash the agent** (unsandboxed mode). Always attach error handlers when spawning processes
 - **\`start\` is a cmd builtin, not an executable** — it won't work through \`execSync\` or \`spawn\`. Run the \`.exe\` path directly, or use \`execSync('cmd /c start ...')\`
 - Use \`π.keyName\` (via \`strings\` param) for content with backticks, template literals, or nested quotes
