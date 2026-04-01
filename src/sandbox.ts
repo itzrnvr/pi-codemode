@@ -453,6 +453,83 @@ function createTruncating$(
 }
 
 /**
+ * Create a PowerShell-tagged template literal similar to $.
+ * Runs PowerShell instead of bash — useful for Windows-native commands
+ * like tasklist, taskkill, netstat, Stop-Process, etc.
+ */
+function createPowerShell$(
+  cwd: string,
+  signal?: AbortSignal,
+  onUpdate?: SandboxOptions["onUpdate"]
+) {
+  const opts: Record<string, unknown> = { cwd, shell: "powershell" };
+  if (signal) opts.signal = signal;
+
+  if (onUpdate) {
+    const streamChunks: Buffer[] = [];
+    let streamBytes = 0;
+    const maxStreamBytes = MAX_OUTPUT_BYTES * 2;
+
+    opts.log = (entry: any) => {
+      if (entry.kind === "stdout" || entry.kind === "stderr") {
+        const data = entry.data as Buffer;
+        streamChunks.push(data);
+        streamBytes += data.length;
+        while (streamBytes > maxStreamBytes && streamChunks.length > 1) {
+          const removed = streamChunks.shift()!;
+          streamBytes -= removed.length;
+        }
+        const fullBuffer = Buffer.concat(streamChunks);
+        const fullText = sanitizeOutput(fullBuffer.toString("utf-8"));
+        const lines = fullText.split("\n");
+        let preview: string;
+        if (lines.length > MAX_OUTPUT_LINES) {
+          preview = lines.slice(-MAX_OUTPUT_LINES).join("\n");
+        } else if (Buffer.byteLength(fullText, "utf-8") > MAX_OUTPUT_BYTES) {
+          preview = truncateStringToBytesFromEnd(fullText, MAX_OUTPUT_BYTES);
+        } else {
+          preview = fullText;
+        }
+        onUpdate({
+          content: [{ type: "text", text: preview }],
+          details: { streaming: true },
+        });
+      }
+    };
+  } else {
+    opts.log = () => {};
+  }
+
+  const base$ = zx.$(opts as any);
+
+  const wrapped = function(pieces: TemplateStringsArray, ...args: any[]) {
+    const proc: any = base$(pieces, ...args);
+    const origThen = proc.then.bind(proc);
+    proc.then = function<T1 = any, T2 = never>(
+      onFulfill?: ((value: any) => T1 | PromiseLike<T1>) | null,
+      onReject?: ((reason: any) => T2 | PromiseLike<T2>) | null
+    ): Promise<T1 | T2> {
+      return origThen(
+        (output: any) => {
+          const truncated = truncateProcessOutput(output);
+          return onFulfill ? onFulfill(truncated) : truncated;
+        },
+        (err: any) => {
+          if (err instanceof zx.ProcessOutput) {
+            err = truncateProcessOutput(err);
+          }
+          if (onReject) return onReject(err);
+          throw err;
+        }
+      );
+    } as any;
+    return proc;
+  };
+
+  return Object.assign(wrapped, base$) as typeof base$;
+}
+
+/**
  * Execute TypeScript code in a sandboxed vm context with tool bindings.
  *
  * @param tsCode - The TypeScript code body (no function wrapper needed)
@@ -622,6 +699,7 @@ export async function executeCode(
 
     // zx shell scripting utilities — $ is configured with cwd, abort signal, and shell prefix
     $: createTruncating$(cwd, signal, onUpdate, shellPrefix),
+    $ps: createPowerShell$(cwd, signal, onUpdate),
     cd: zx.cd,
     within: zx.within,
     nothrow: zx.nothrow,
@@ -780,6 +858,7 @@ async function executeUnsandboxed(
 
     // zx shell scripting
     $: createTruncating$(cwd, signal, onUpdate, shellPrefix),
+    $ps: createPowerShell$(cwd, signal, onUpdate),
     cd: zx.cd,
     within: zx.within,
     nothrow: zx.nothrow,

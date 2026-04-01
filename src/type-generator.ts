@@ -96,6 +96,9 @@ import type { nothrow as NothrowFn, quiet as QuietFn } from 'zx';
 /** zx shell command — execute shell commands with template literals. Arguments are automatically escaped for safety. */
 declare const $: typeof Shell;
 
+/** PowerShell shell command — runs PowerShell instead of bash. Use on Windows for native commands like tasklist, netstat, Stop-Process. */
+declare const $ps: typeof Shell;
+
 /** Change the current working directory for subsequent $ commands. */
 declare const cd: typeof CdFn;
 
