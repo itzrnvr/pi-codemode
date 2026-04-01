@@ -352,23 +352,14 @@ function createTruncating$(
   const opts: Record<string, unknown> = { cwd };
   if (signal) opts.signal = signal;
 
-  // On Windows, explicitly use cmd.exe unless user has set a specific shell
-  if (process.platform === "win32") {
-    opts.shell = process.env.SHELL || "cmd.exe";
-  }
-  // Compose shell prefix: On Unix, keep zx's default "set -euo pipefail;" and append
-  // the user's shell command prefix (e.g., "export TERM=dumb CI=true ...").
-  // On Windows, skip bash syntax and just pass the user's prefix if any.
-  // The prefix is prepended to every command executed via $.
+  // zx defaults to bash with "set -euo pipefail;" prefix on all platforms.
+  // On Windows, zx automatically finds and uses Git Bash (bash.exe).
+  // We only need to customize the prefix if the user provided a shellPrefix.
+  // Do NOT override shell on Windows - zx's bash default works correctly.
   if (shellPrefix) {
     const normalized = shellPrefix.trimEnd().replace(/;$/, "");
-    if (process.platform === "win32") {
-      // Windows: no bash "set -euo pipefail", just the user's prefix
-      opts.prefix = normalized ? `${normalized}; ` : undefined;
-    } else {
-      // Unix/Linux/Mac: use bash strict mode
-      opts.prefix = `set -euo pipefail; ${normalized}; `;
-    }
+    // Prefix is always bash syntax since zx uses bash on all platforms
+    opts.prefix = `set -euo pipefail; ${normalized}; `;
   }
 
   // Hook into zx's log system to stream partial output to the UI.
