@@ -81,6 +81,8 @@ Use \`tools.describe_tools({ namespace })\` to browse tools, \`tools.search_tool
 - **Always \`await\`** shell commands: \`const r = await $\\\`cmd\\\`\` — unawaited \`$\` returns nothing
 - \`$\\\`cmd\\\`\` runs **bash** via Git Bash on ALL platforms. Use Unix commands (\`grep\`, \`ls\`, \`cat\`, \`git\`). **Windows commands hang** (\`taskkill\`, \`netstat\`, \`tasklist\`, \`powershell\`, \`cmd\`)
 - **If a command times out or hangs** — use Node.js APIs instead: \`fetch()\` for HTTP, \`require('net')\` for sockets, \`require('child_process')\` for process management, \`os.*\` for system info
+- **\`spawn()\` without \`.on('error', ...)\` can crash the agent** (unsandboxed mode). Always attach error handlers when spawning processes
+- **\`start\` is a cmd builtin, not an executable** — it won't work through \`execSync\` or \`spawn\`. Run the \`.exe\` path directly, or use \`execSync('cmd /c start ...')\`
 - Use \`π.keyName\` (via \`strings\` param) for content with backticks, template literals, or nested quotes
 - Configured packages are **pre-loaded globals** — use directly (e.g. \`axios.get(...)\`), not via \`require()\`
 `;

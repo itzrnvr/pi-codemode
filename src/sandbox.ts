@@ -802,6 +802,27 @@ async function executeUnsandboxed(
     ...userPackages,
   };
 
+  // Guard against LLM code crashing the entire process via uncaught exceptions
+  let crashReject: ((err: Error) => void) | undefined;
+  const crashPromise = new Promise<never>((_, reject) => {
+    crashReject = reject;
+  });
+  const uncaughtListener = (err: Error) => {
+    if (crashReject) crashReject(new Error(`Uncaught exception: ${err.message}`));
+  };
+  const unhandledListener = (reason: any) => {
+    const msg = reason?.message ?? String(reason);
+    if (crashReject) crashReject(new Error(`Unhandled rejection: ${msg}`));
+  };
+
+  // Save existing listeners so we can restore them
+  const existingUncaught = process.listeners("uncaughtException");
+  const existingUnhandled = process.listeners("unhandledRejection");
+  process.removeAllListeners("uncaughtException");
+  process.removeAllListeners("unhandledRejection");
+  process.on("uncaughtException", uncaughtListener);
+  process.on("unhandledRejection", unhandledListener);
+
   try {
     // Create a function with all globals as parameters, then call it
     const globalKeys = Object.keys(globalContext);
@@ -823,6 +844,7 @@ async function executeUnsandboxed(
           timeout
         )
       ),
+      crashPromise,
     ];
 
     if (signal) {
@@ -860,5 +882,14 @@ async function executeUnsandboxed(
       returnValue: undefined,
       elapsedMs: performance.now() - start,
     };
+  } finally {
+    process.removeListener("uncaughtException", uncaughtListener);
+    process.removeListener("unhandledRejection", unhandledListener);
+    for (const listener of existingUncaught) {
+      process.on("uncaughtException", listener);
+    }
+    for (const listener of existingUnhandled) {
+      process.on("unhandledRejection", listener);
+    }
   }
 }
