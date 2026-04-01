@@ -1,7 +1,7 @@
 {
-  "name": "@georgebashi/pi-codemode",
+  "name": "@itzrnvr/pi-codemode",
   "version": "0.1.0",
-  "description": "Code Mode extension for Pi — execute tools via TypeScript code, with type-checking, shell via zx, and MCP integration",
+  "description": "Code Mode extension for Pi — execute tools via TypeScript code, with type-checking, shell via zx, and MCP integration (fork with Windows support)",
   "keywords": [
     "pi-package",
     "pi-extension",
@@ -10,10 +10,10 @@
     "tools"
   ],
   "license": "MIT",
-  "author": "George Bashi <george@bashi.co.uk>",
+  "author": "itzrnvr (forked from George Bashi)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/georgebashi/pi-codemode.git"
+    "url": "git+https://github.com/itzrnvr/pi-codemode.git"
   },
   "type": "commonjs",
   "files": [
@@ -22,6 +22,7 @@
     "LICENSE"
   ],
   "scripts": {
+    "build": "tsc --outDir dist",
     "test": "node test/run.js"
   },
   "pi": {
