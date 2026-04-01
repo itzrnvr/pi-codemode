@@ -1,0 +1,53 @@
+{
+  "name": "@georgebashi/pi-codemode",
+  "version": "0.1.0",
+  "description": "Code Mode extension for Pi — execute tools via TypeScript code, with type-checking, shell via zx, and MCP integration",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "code-mode",
+    "typescript",
+    "tools"
+  ],
+  "license": "MIT",
+  "author": "George Bashi <george@bashi.co.uk>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/georgebashi/pi-codemode.git"
+  },
+  "type": "commonjs",
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node test/run.js"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "dependencies": {
+    "esbuild": "^0.27.3",
+    "fs-extra": "^11.3.4",
+    "minisearch": "^7.2.0",
+    "pi-mcp-adapter": "^2.1.2",
+    "typescript": "^5.9.3",
+    "zx": "^8.8.5"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-agent-core": "*",
+    "@sinclair/typebox": "*",
+    "@mariozechner/pi-tui": "*"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-agent-core": "*",
+    "@sinclair/typebox": "*",
+    "@mariozechner/pi-tui": "*"
+  }
+}
