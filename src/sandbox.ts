@@ -481,6 +481,10 @@ export async function executeCode(
   // Set zx's working directory for this execution
   zx.$.cwd = cwd;
 
+  // Fix common LLM escaping issue: models often escape backticks in JSON strings,
+  // producing \` in code (e.g., $\`cmd\` instead of $`cmd`). Strip these.
+  tsCode = tsCode.replace(/\\`/g, '`');
+
   // Step 1: Type-check (also for unsandboxed mode - catches errors early)
   const checkResult = typeCheck(tsCode, typeDefs);
   if (checkResult.errors.length > 0) {

@@ -58,6 +58,18 @@ const contents = await Promise.all(files.map(f => tools.read({ path: f })));
 const matches = contents.flatMap((c, i) => c.includes("TODO") ? [files[i]] : []);
 return matches;
 \`\`\`
+
+\`\`\`typescript
+// Check ports / HTTP services — use fetch(), NOT shell commands like netstat or curl
+const ports = [8080, 8081, 11434];
+const results = await Promise.all(ports.map(async (p: number) => {
+  try {
+    const r = await fetch("http://localhost:" + p, { signal: AbortSignal.timeout(3000) });
+    return { port: p, running: true, status: r.status };
+  } catch { return { port: p, running: false }; }
+}));
+return results.filter((r: any) => r.running);
+\`\`\`
 ${mcpSummary ? `
 ${mcpSummary}
 
@@ -67,7 +79,8 @@ Use \`tools.describe_tools({ namespace })\` to browse tools, \`tools.search_tool
 - **Parallelize** independent calls with \`Promise.all\` — sequential awaits waste time
 - **Filter locally** — process data in code, return only what matters (huge token savings)
 - **Always \`await\`** shell commands: \`const r = await $\\\`cmd\\\`\` — unawaited \`$\` returns nothing
-- \`$\\\`cmd\\\`\` runs **bash** (zx) on ALL platforms including Windows (via Git Bash). Use Unix commands (\`grep\`, \`curl\`, \`ls\`), NOT Windows-specific ones (\`findstr\`, \`tasklist /FI\`, \`netstat\`). For process/port inspection, prefer \`fetch()\` or Node.js APIs (\`require('http')\`, \`require('net')\`)
+- **NEVER use \`netstat\`, \`tasklist\`, \`findstr\`, or other Windows-specific commands** — they hang or fail in bash. For port/process checks, use \`fetch()\` (see example above). For system info, use \`os.*\` or \`require('net')\`
+- \`$\\\`cmd\\\`\` runs **bash** (zx) — use Unix commands (\`grep\`, \`ls\`, \`ps\`). On Windows this runs via Git Bash
 - Use \`π.keyName\` (via \`strings\` param) for content with backticks, template literals, or nested quotes
 - Configured packages are **pre-loaded globals** — use directly (e.g. \`axios.get(...)\`), not via \`require()\`
 `;
