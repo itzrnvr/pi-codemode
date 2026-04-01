@@ -9,7 +9,7 @@
 
 import vm from "node:vm";
 import { randomBytes } from "node:crypto";
-import { writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { transformSync } from "esbuild";
@@ -19,6 +19,24 @@ import * as zx from "zx";
 
 // Suppress zx's default verbose logging (prints commands to stderr)
 zx.$.verbose = false;
+
+/** Find Git Bash executable on Windows. Prefers known paths over PATH lookup. */
+function findGitBash(): string | undefined {
+  if (process.platform !== "win32") return undefined;
+  const candidates = [
+    process.env.GIT_INSTALL_ROOT ? `${process.env.GIT_INSTALL_ROOT}\\usr\\bin\\bash.exe` : null,
+    process.env.GIT_INSTALL_ROOT ? `${process.env.GIT_INSTALL_ROOT}\\bin\\bash.exe` : null,
+    "C:\\Program Files\\Git\\usr\\bin\\bash.exe",
+    "C:\\Program Files\\Git\\bin\\bash.exe",
+    "C:\\Program Files (x86)\\Git\\usr\\bin\\bash.exe",
+    "C:\\Program Files (x86)\\Git\\bin\\bash.exe",
+  ].filter(Boolean) as string[];
+
+  for (const p of candidates) {
+    if (existsSync(p)) return p;
+  }
+  return undefined;
+}
 export interface ExecutionResult {
   success: boolean;
   /** Type errors or runtime errors */
@@ -352,19 +370,22 @@ function createTruncating$(
   const opts: Record<string, unknown> = { cwd };
   if (signal) opts.signal = signal;
 
-  // On Windows, Git Bash's MSYS layer auto-converts args that look like paths
-  // (e.g., /FI → C:/Program Files/Git/FI). Set env vars to disable this.
-  // We set on process.env directly because spreading it into a plain object
-  // breaks Windows' case-insensitive env handling and causes commands to hang.
+  // On Windows, force Git Bash to avoid broken fallbacks (e.g. WSL).
   if (process.platform === "win32") {
+    const gitBash = findGitBash();
+    if (gitBash) {
+      opts.shell = gitBash;
+    }
+    // Git Bash's MSYS layer auto-converts args that look like paths
+    // (e.g., /FI → C:/Program Files/Git/FI). Set env vars to disable this.
+    // We set on process.env directly because spreading it into a plain object
+    // breaks Windows' case-insensitive env handling and causes commands to hang.
     process.env.MSYS_NO_PATHCONV = "1";
     process.env.MSYS2_ARG_CONV_EXCL = "*";
   }
 
   // zx defaults to bash with "set -euo pipefail;" prefix on all platforms.
-  // On Windows, zx automatically finds and uses Git Bash (bash.exe).
   // We only need to customize the prefix if the user provided a shellPrefix.
-  // Do NOT override shell on Windows - zx's bash default works correctly.
   if (shellPrefix) {
     const normalized = shellPrefix.trimEnd().replace(/;$/, "");
     // Prefix is always bash syntax since zx uses bash on all platforms
@@ -462,7 +483,8 @@ function createPowerShell$(
   signal?: AbortSignal,
   onUpdate?: SandboxOptions["onUpdate"]
 ) {
-  const opts: Record<string, unknown> = { cwd, shell: "powershell" };
+  // Clear the bash prefix so PowerShell doesn't receive "set -euo pipefail;"
+  const opts: Record<string, unknown> = { cwd, shell: "powershell", prefix: "" };
   if (signal) opts.signal = signal;
 
   if (onUpdate) {
