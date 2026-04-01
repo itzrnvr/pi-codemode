@@ -481,12 +481,7 @@ export async function executeCode(
   // Set zx's working directory for this execution
   zx.$.cwd = cwd;
 
-  // UNSANDBOXED MODE: Run code directly with full Node.js access
-  if (unsandboxed) {
-    return await executeUnsandboxed(jsCode, bindings, cwd, signal, onUpdate, shellPrefix, userPackages, strings, timeout, start);
-  }
-
-  // Step 1: Type-check
+  // Step 1: Type-check (also for unsandboxed mode - catches errors early)
   const checkResult = typeCheck(tsCode, typeDefs);
   if (checkResult.errors.length > 0) {
     return {
@@ -524,6 +519,11 @@ export async function executeCode(
       returnValue: undefined,
       elapsedMs: performance.now() - start,
     };
+  }
+
+  // UNSANDBOXED MODE: Run code directly with full Node.js access
+  if (unsandboxed) {
+    return await executeUnsandboxed(jsCode, bindings, cwd, signal, onUpdate, shellPrefix, userPackages, strings, timeout, start);
   }
 
   // Step 3: Create vm context with bindings and safe globals
