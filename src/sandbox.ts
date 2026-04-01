@@ -419,18 +419,18 @@ function createTruncating$(
 
   // Return a tagged template function that wraps the ProcessPromise
   const wrapped = function(pieces: TemplateStringsArray, ...args: any[]) {
-    const proc = base$(pieces, ...args);
+    const proc: any = base$(pieces, ...args);
 
     // Wrap .then to intercept the ProcessOutput and truncate it
     const origThen = proc.then.bind(proc);
-    proc.then = function<T1 = zx.ProcessOutput, T2 = never>(
-      onFulfill?: ((value: zx.ProcessOutput) => T1 | PromiseLike<T1>) | null,
+    proc.then = function<T1 = any, T2 = never>(
+      onFulfill?: ((value: any) => T1 | PromiseLike<T1>) | null,
       onReject?: ((reason: any) => T2 | PromiseLike<T2>) | null
     ): Promise<T1 | T2> {
       return origThen(
-        (output: zx.ProcessOutput) => {
+        (output: any) => {
           const truncated = truncateProcessOutput(output);
-          return onFulfill ? onFulfill(truncated) : truncated as any;
+          return onFulfill ? onFulfill(truncated) : truncated;
         },
         (err: any) => {
           // On error, zx throws a ProcessOutput — truncate it too
@@ -590,6 +590,22 @@ export async function executeCode(
     queueMicrotask,
     atob,
     btoa,
+
+    // Process (limited safe properties)
+    process: {
+      env: process.env,
+      cwd: () => cwd,
+      platform: process.platform,
+      version: process.version,
+      arch: process.arch,
+      uptime: process.uptime,
+      memoryUsage: process.memoryUsage,
+      hrtime: process.hrtime,
+      nextTick: process.nextTick,
+    },
+
+    // Buffer for binary data
+    Buffer,
 
     // zx shell scripting utilities — $ is configured with cwd, abort signal, and shell prefix
     $: createTruncating$(cwd, signal, onUpdate, shellPrefix),
