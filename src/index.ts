@@ -11,6 +11,9 @@
 //
 // Search: MiniSearch FTS over all Pi + MCP tools (fuzzy, prefix, BM25 ranked)
 
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { SettingsManager } from "@mariozechner/pi-coding-agent";
 import { initTypeChecker } from "./type-checker.js";
@@ -99,6 +102,21 @@ export default function codeMode(pi: ExtensionAPI) {
     // Settings not available — no prefix
   }
 
+  // --- Read unsandboxed mode from codemode.json config ---
+  let unsandboxed = false;
+  try {
+    const codemodeConfigPath = path.join(os.homedir(), ".pi", "agent", "codemode.json");
+    if (fs.existsSync(codemodeConfigPath)) {
+      const config = JSON.parse(fs.readFileSync(codemodeConfigPath, "utf-8"));
+      unsandboxed = config.unsandboxed === true;
+      if (unsandboxed) {
+        console.warn("Code Mode: UNSANDBOXED MODE ENABLED - LLM code runs with full system access!");
+      }
+    }
+  } catch {
+    // Config doesn't exist or is invalid
+  }
+
   // --- Register the execute_tools tool ---
 
   const executeTool = createExecuteTool({
@@ -109,6 +127,7 @@ export default function codeMode(pi: ExtensionAPI) {
     },
     shellPrefix,
     userPackages: userPackageMap,
+    unsandboxed,
   });
 
   pi.registerTool(executeTool);

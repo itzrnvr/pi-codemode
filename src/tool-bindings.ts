@@ -87,7 +87,12 @@ export function createToolBindings(options: ToolBindingsOptions): ToolBindings {
 
     async edit(params) {
       if (signal?.aborted) throw new Error("Execution cancelled");
-      const result = await editTool.execute(toolCallId, params, signal);
+      // Transform { path, oldText, newText } to { path, edits: [{ oldText, newText }] }
+      const transformedParams = {
+        path: params.path,
+        edits: [{ oldText: params.oldText, newText: params.newText }]
+      };
+      const result = await editTool.execute(toolCallId, transformedParams, signal);
       const text = result.content
         .filter((c): c is { type: "text"; text: string } => c.type === "text")
         .map((c) => c.text)

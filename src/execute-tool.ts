@@ -21,6 +21,8 @@ export interface ExecuteToolOptions {
   shellPrefix?: string;
   /** User-configured packages to inject as globals (varName → module) */
   userPackages?: Record<string, unknown>;
+  /** Disable sandbox for full system access (DANGER: code runs unsandboxed) */
+  unsandboxed?: boolean;
 }
 
 /**
@@ -29,7 +31,7 @@ export interface ExecuteToolOptions {
 export function createExecuteTool(
   options: ExecuteToolOptions
 ): ToolDefinition {
-  const { typeDefs, bindingsOptions, timeout, maxOutputSize, shellPrefix, userPackages } = options;
+  const { typeDefs, bindingsOptions, timeout, maxOutputSize, shellPrefix, userPackages, unsandboxed } = options;
 
   return {
     name: "execute_tools",
@@ -77,7 +79,7 @@ Return a value to include it in the result. Type errors are returned for correct
         params.code,
         typeDefs,
         bindings,
-        { timeout, maxOutputSize, cwd: bindingsOptions.cwd, signal, onUpdate, shellPrefix, userPackages, strings: params.strings }
+        { timeout, maxOutputSize, cwd: bindingsOptions.cwd, signal, onUpdate, shellPrefix, userPackages, strings: params.strings, unsandboxed }
       );
 
       if (!result.success) {

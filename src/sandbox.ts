@@ -50,6 +50,8 @@ export interface SandboxOptions {
   userPackages?: Record<string, unknown>;
   /** Named string constants injected as π.keyName — for file content that's hard to quote in JS */
   strings?: Record<string, string>;
+  /** Disable sandbox and run code with full Node.js access (DANGER: LLM code runs unsandboxed) */
+  unsandboxed?: boolean;
 }
 
 const DEFAULT_TIMEOUT = 120_000;
@@ -474,9 +476,15 @@ export async function executeCode(
   const shellPrefix = options?.shellPrefix;
   const userPackages = options?.userPackages ?? {};
   const strings = options?.strings ?? {};
+  const unsandboxed = options?.unsandboxed ?? false;
 
   // Set zx's working directory for this execution
   zx.$.cwd = cwd;
+
+  // UNSANDBOXED MODE: Run code directly with full Node.js access
+  if (unsandboxed) {
+    return await executeUnsandboxed(jsCode, bindings, cwd, signal, onUpdate, shellPrefix, userPackages, strings, timeout, start);
+  }
 
   // Step 1: Type-check
   const checkResult = typeCheck(tsCode, typeDefs);
@@ -684,6 +692,166 @@ export async function executeCode(
       errorKind: 'runtime',
       errors: [{ line: Math.max(1, line), col: 0, message }],
       logs, // Include any logs captured before the error
+      returnValue: undefined,
+      elapsedMs: performance.now() - start,
+    };
+  }
+}
+
+/**
+ * Execute code without sandbox - FULL SYSTEM ACCESS.
+ * This runs the code directly with Node.js, giving it access to:
+ * - require() any module
+ * - Full process object
+ * - File system without restrictions
+ * - Network access
+ * - All system calls
+ *
+ * DANGER: Only use this if you trust the code being executed!
+ */
+async function executeUnsandboxed(
+  jsCode: string,
+  bindings: ToolBindings,
+  cwd: string,
+  signal?: AbortSignal,
+  onUpdate?: SandboxOptions["onUpdate"],
+  shellPrefix?: string,
+  userPackages?: Record<string, unknown>,
+  strings?: Record<string, string>,
+  timeout: number = DEFAULT_TIMEOUT,
+  start: number = performance.now()
+): Promise<ExecutionResult> {
+  const logs: string[] = [];
+  let totalLogSize = 0;
+
+  const captureLog = (...args: unknown[]) => {
+    const line = args
+      .map((a) =>
+        typeof a === "object" && a !== null ? JSON.stringify(a) : String(a)
+      )
+      .join(" ");
+    totalLogSize += line.length;
+    if (totalLogSize <= 50 * 1024) {
+      logs.push(line);
+    } else if (logs[logs.length - 1] !== "[output truncated]") {
+      logs.push("[output truncated]");
+    }
+  };
+
+  // Create the global context with EVERYTHING available
+  const globalContext: Record<string, any> = {
+    // Tool bindings
+    tools: bindings,
+    print: captureLog,
+
+    // Console (captured)
+    console: {
+      log: captureLog,
+      warn: captureLog,
+      error: captureLog,
+      info: captureLog,
+    },
+
+    // Node.js built-ins (full access!)
+    require,
+    process,
+    Buffer,
+    global,
+    __dirname: cwd,
+    __filename: path.join(cwd, "codemode.js"),
+    module: { exports: {} },
+    exports: {},
+
+    // URL and Web APIs
+    URL,
+    URLSearchParams,
+    TextEncoder,
+    TextDecoder,
+    structuredClone,
+    queueMicrotask,
+    atob,
+    btoa,
+    fetch: globalThis.fetch,
+
+    // zx shell scripting
+    $: createTruncating$(cwd, signal, onUpdate, shellPrefix),
+    cd: zx.cd,
+    within: zx.within,
+    nothrow: zx.nothrow,
+    quiet: zx.quiet,
+    retry: zx.retry,
+    sleep: zx.sleep,
+    chalk: zx.chalk,
+    which: zx.which,
+    quote: zx.quote,
+    glob: zx.glob,
+    os: zx.os,
+    path: zx.path,
+    fs: zx.fs,
+    ProcessOutput: zx.ProcessOutput,
+
+    // Named string constants
+    π: Object.freeze(strings ?? {}),
+
+    // User packages
+    ...userPackages,
+  };
+
+  try {
+    // Create a function with all globals as parameters, then call it
+    const globalKeys = Object.keys(globalContext);
+  const globalValues = Object.values(globalContext);
+
+  // Build the function - unwrap the IIFE that esbuild created
+  // jsCode is like: (async () => { ...code... })  (note: no trailing call)
+    const fn = new Function(
+      ...globalKeys,
+      `"use strict";\nreturn (${jsCode})();`
+    );
+
+    // Execute with timeout and abort signal
+    const racePromises: Promise<any>[] = [
+      Promise.resolve(fn(...globalValues)),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`Execution timed out after ${timeout}ms`)),
+          timeout
+        )
+      ),
+    ];
+
+    if (signal) {
+      racePromises.push(
+        new Promise<never>((_, reject) => {
+          if (signal.aborted) {
+            reject(new Error("Execution cancelled"));
+            return;
+          }
+          signal.addEventListener("abort", () => reject(new Error("Execution cancelled")), { once: true });
+        })
+      );
+    }
+
+    const returnValue = await Promise.race(racePromises);
+
+    return {
+      success: true,
+      errors: [],
+      logs,
+      returnValue,
+      elapsedMs: performance.now() - start,
+    };
+  } catch (e: any) {
+    const message = e?.message ?? String(e);
+    // Try to extract line number from stack trace
+    const stackMatch = message.match(/codemode\.js:(\d+)/);
+    const line = stackMatch ? parseInt(stackMatch[1], 10) - 1 : 0;
+
+    return {
+      success: false,
+      errorKind: 'runtime',
+      errors: [{ line: Math.max(1, line), col: 0, message }],
+      logs,
       returnValue: undefined,
       elapsedMs: performance.now() - start,
     };
