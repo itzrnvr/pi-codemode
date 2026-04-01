@@ -36,29 +36,14 @@ export function createExecuteTool(
   return {
     name: "execute_tools",
     label: "Execute Tools",
-    description: `Execute TypeScript code that calls tools as typed functions.
-Write code using the tools.* API. Your code is type-checked before execution.
-
-Available tools in code:
-- tools.read({ path }) → file content as string
-- tools.write({ path, content }) → void
-- tools.edit({ path, oldText, newText }) → find-and-replace in file
-- tools.<server>.<tool>(args) → call MCP tools (e.g., tools.slack.channels_me())
-- tools.search_tools({ query }) → discover available tools
-- tools.progress(msg) → stream progress to UI
-- print(...) → output to include in result
-- π.keyName → string constants from the 'strings' parameter
-
-Return a value to include it in the result. Type errors are returned for correction.`,
+    description: `Execute TypeScript code with tools.* API, $\`shell\`, and npm packages. Type-checked before execution. print() for output, return for result.`,
 
     parameters: Type.Object({
       code: Type.String({
-        description:
-          "TypeScript code body. Has access to tools.read(), tools.write(), tools.edit(), tools.<server>.<tool>() for MCP, tools.search_tools(), print(), and tools.progress(). String constants from the 'strings' parameter are available as π.keyName.",
+        description: "TypeScript code body (async context, top-level await)",
       }),
       strings: Type.Optional(Type.Record(Type.String(), Type.String(), {
-        description:
-          "Named string constants injected into the code as π.keyName. Use this for file content, templates, or any text that would be hard to quote inside JavaScript code. The strings only need standard JSON escaping — no JS string literal escaping required.",
+        description: "String constants available as π.keyName — for content hard to quote in JS",
       })),
     }),
 
@@ -84,19 +69,15 @@ Return a value to include it in the result. Type errors are returned for correct
 
       if (!result.success) {
         const errorText = result.errors
-          .map((e) => (e.line > 0 ? `Line ${e.line}: ${e.message}` : e.message))
+          .map((e) => (e.line > 0 ? `L${e.line}: ${e.message}` : e.message))
           .join("\n");
 
-        let text: string;
-          if (result.errorKind === 'type') {
-            text = `Type errors (code was NOT executed):\n${errorText}\n\nFix the type errors and try again.`;
-          } else {
-            text = `Runtime error:\n${errorText}\n\nThe code executed but threw an error. This may be a bug in your code or a server-side issue.`;
-          }
+        const prefix = result.errorKind === 'type' ? 'Type error (not executed)' : 'Runtime error';
+        let text = `${prefix}:\n${errorText}`;
 
         // Include any logs captured before the error (for runtime errors)
         if (result.logs.length > 0) {
-          text = `Output before error:\n${result.logs.join("\n")}\n\n${text}`;
+          text = `Output:\n${result.logs.join("\n")}\n\n${text}`;
         }
 
         return {
@@ -118,10 +99,14 @@ Return a value to include it in the result. Type errors are returned for correct
       }
 
       if (result.returnValue !== undefined) {
-        const formatted =
-          typeof result.returnValue === "string"
-            ? result.returnValue
-            : JSON.stringify(result.returnValue, null, 2);
+        let formatted: string;
+        if (typeof result.returnValue === "string") {
+          formatted = result.returnValue;
+        } else {
+          // Compact JSON for small results, pretty for large ones (saves tokens)
+          const compact = JSON.stringify(result.returnValue);
+          formatted = compact.length > 500 ? JSON.stringify(result.returnValue, null, 2) : compact;
+        }
         parts.push(formatted);
       }
 

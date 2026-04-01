@@ -150,6 +150,24 @@ declare module 'zx' {
   }
 }
 
+/** Native fetch — make HTTP requests without shell commands. Prefer over $\`curl\` for port checks and API calls. */
+interface FetchResponse {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  url: string;
+  text(): Promise<string>;
+  json(): Promise<any>;
+  arrayBuffer(): Promise<ArrayBuffer>;
+  headers: { get(name: string): string | null; has(name: string): boolean };
+}
+declare function fetch(input: string | URL, init?: {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+  signal?: AbortSignal;
+}): Promise<FetchResponse>;
+
 /** Named string constants passed via the 'strings' parameter. Use for file content that's hard to quote in JS. */
 declare const π: Readonly<Record<string, string>>;
 `;

@@ -352,6 +352,15 @@ function createTruncating$(
   const opts: Record<string, unknown> = { cwd };
   if (signal) opts.signal = signal;
 
+  // On Windows, Git Bash's MSYS layer auto-converts args that look like paths
+  // (e.g., /FI → C:/Program Files/Git/FI). Set env vars to disable this.
+  // We set on process.env directly because spreading it into a plain object
+  // breaks Windows' case-insensitive env handling and causes commands to hang.
+  if (process.platform === "win32") {
+    process.env.MSYS_NO_PATHCONV = "1";
+    process.env.MSYS2_ARG_CONV_EXCL = "*";
+  }
+
   // zx defaults to bash with "set -euo pipefail;" prefix on all platforms.
   // On Windows, zx automatically finds and uses Git Bash (bash.exe).
   // We only need to customize the prefix if the user provided a shellPrefix.
@@ -589,6 +598,7 @@ export async function executeCode(
     queueMicrotask,
     atob,
     btoa,
+    fetch: globalThis.fetch,
 
     // Process (limited safe properties)
     process: {
